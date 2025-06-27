@@ -102,11 +102,58 @@ generic-rest/
 
 ## 🔧 Configuração
 
+### Porta do Servidor
 O servidor roda na porta 3000 por padrão. Você pode alterar isso definindo a variável de ambiente `PORT`:
 
 ```bash
 PORT=8080 npm start
 ```
+
+### Caminho do Banco de Dados
+Por padrão, os dados são salvos na pasta `db/` do projeto. Você pode configurar um caminho personalizado de três formas:
+
+> **💡 Criação Automática**: O diretório especificado será criado automaticamente durante a inicialização do servidor se não existir.
+
+#### 1. Argumento da linha de comando:
+```bash
+node src/index.js --db-path /caminho/personalizado/dados
+npm start -- --db-path /caminho/personalizado/dados
+```
+
+#### 2. Variável de ambiente:
+```bash
+DB_PATH=/caminho/personalizado/dados npm start
+```
+
+#### 3. Docker/Dev Container:
+```bash
+# No docker-compose.yml ou devcontainer.json
+DB_PATH=/workspace/meus-dados
+```
+
+### Ordem de prioridade:
+1. **Argumento `--db-path`** (maior prioridade)
+2. **Variável de ambiente `DB_PATH`**
+3. **Padrão `./db`** (menor prioridade)
+
+### Exemplos de uso:
+
+```bash
+# Usar pasta específica
+node src/index.js --db-path /var/data/api
+
+# Usar pasta temporária para testes
+DB_PATH=/tmp/test-data npm run dev
+
+# Usar pasta relativa
+npm start -- --db-path ./meus-dados
+
+# Verificar qual pasta está sendo usada (aparece no log de inicialização)
+npm start -- --db-path ./custom-db
+# Output: 📁 Diretório de dados: /workspaces/generic-rest/custom-db
+```
+
+> **💡 Dica**: O caminho absoluto sendo usado sempre aparece no log de inicialização do servidor para confirmação.
 
 ## 📋 Endpoints
 

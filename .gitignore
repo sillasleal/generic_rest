@@ -8,11 +8,12 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Arquivos de teste
+__tests__/
 coverage/
+test-db/
 
-# Logs
-logs
+# Logs de teste
 *.log
 
 # Environment variables
