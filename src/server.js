@@ -8,6 +8,7 @@ class GenericRestServer {
     this.app = express();
     this.port = options.port || process.env.PORT || 3000;
     this.dbPath = options.dbPath || process.env.DB_PATH || path.join(process.cwd(), 'db');
+    this.verbose = options.verbose || process.env.VERBOSE === 'true' || false;
     this.server = null;
     
     // Resolve absolute path
@@ -19,6 +20,34 @@ class GenericRestServer {
 
   setupMiddleware() {
     this.app.use(express.json());
+    
+    // Verbose logging middleware
+    if (this.verbose) {
+      this.app.use((req, res, next) => {
+        const startTime = Date.now();
+        const timestamp = new Date().toISOString();
+        
+        console.log(`\n📥 [${timestamp}] ${req.method} ${req.path}`);
+        console.log(`   Query: ${JSON.stringify(req.query)}`);
+        console.log(`   Body: ${JSON.stringify(req.body)}`);
+        console.log(`   Headers: ${JSON.stringify(req.headers)}`);
+        
+        // Override res.json to log response
+        const originalJson = res.json;
+        res.json = function(data) {
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          
+          console.log(`📤 [${new Date().toISOString()}] Response (${duration}ms):`);
+          console.log(`   Status: ${res.statusCode}`);
+          console.log(`   Data: ${JSON.stringify(data, null, 2)}`);
+          
+          return originalJson.call(this, data);
+        };
+        
+        next();
+      });
+    }
   }
 
   async ensureDirectoryExists(dirPath) {
@@ -177,6 +206,9 @@ class GenericRestServer {
           }
         }
       } catch (error) {
+        if (this.verbose) {
+          console.error(`❌ [${new Date().toISOString()}] Erro no GET ${req.path}:`, error);
+        }
         console.error('Erro no GET:', error);
         res.status(500).json({ error: 'Erro interno do servidor' });
       }
@@ -199,6 +231,9 @@ class GenericRestServer {
         
         res.status(201).json(data);
       } catch (error) {
+        if (this.verbose) {
+          console.error(`❌ [${new Date().toISOString()}] Erro no POST ${req.path}:`, error);
+        }
         console.error('Erro no POST:', error);
         res.status(500).json({ error: 'Erro interno do servidor' });
       }
@@ -242,6 +277,9 @@ class GenericRestServer {
           }
         }
       } catch (error) {
+        if (this.verbose) {
+          console.error(`❌ [${new Date().toISOString()}] Erro no PUT ${req.path}:`, error);
+        }
         console.error('Erro no PUT:', error);
         res.status(500).json({ error: 'Erro interno do servidor' });
       }
@@ -285,6 +323,9 @@ class GenericRestServer {
           }
         }
       } catch (error) {
+        if (this.verbose) {
+          console.error(`❌ [${new Date().toISOString()}] Erro no PATCH ${req.path}:`, error);
+        }
         console.error('Erro no PATCH:', error);
         res.status(500).json({ error: 'Erro interno do servidor' });
       }
@@ -318,6 +359,9 @@ class GenericRestServer {
           }
         }
       } catch (error) {
+        if (this.verbose) {
+          console.error(`❌ [${new Date().toISOString()}] Erro no DELETE ${req.path}:`, error);
+        }
         console.error('Erro no DELETE:', error);
         res.status(500).json({ error: 'Erro interno do servidor' });
       }
@@ -346,7 +390,8 @@ class GenericRestServer {
 
         console.log(`🚀 Servidor rodando na porta ${this.port}`);
         console.log(`📁 Diretório de dados: ${this.dbPath}`);
-        console.log(`📋 Endpoints disponíveis:`);
+        console.log(`� Modo verbose: ${this.verbose ? 'Ativado' : 'Desativado'}`);
+        console.log(`�📋 Endpoints disponíveis:`);
         console.log(`   GET    /* - Listar itens de uma coleção (com filtros)`);
         console.log(`   GET    /*/:id - Obter item específico por UUID`);
         console.log(`   POST   /* - Criar novo item`);

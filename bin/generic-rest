@@ -6,6 +6,7 @@ const { startServer } = require('../src/server');
 const args = process.argv.slice(2);
 let port = 3000;
 let dbPath = null;
+let verbose = false;
 
 // Parse arguments
 for (let i = 0; i < args.length; i++) {
@@ -17,6 +18,8 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === '--db-path' || arg === '--db') {
     dbPath = args[i + 1];
     i++; // Skip next argument
+  } else if (arg === '--verbose' || arg === '-v') {
+    verbose = true;
   } else if (arg === '--help' || arg === '-h') {
     console.log(`
 Generic REST API CLI
@@ -26,17 +29,19 @@ Usage: generic-rest [options]
 Options:
   -p, --port <port>      Port to run the server (default: 3000)
   --db-path, --db <path> Database path (default: ./db)
+  -v, --verbose          Enable verbose logging
   -h, --help            Show this help message
 
 Examples:
   generic-rest
   generic-rest --port 8080
   generic-rest --db-path ./data
-  generic-rest -p 8080 --db ./my-data
+  generic-rest -p 8080 --db ./my-data --verbose
+  generic-rest -v
 `);
     process.exit(0);
   }
 }
 
 // Start the server
-startServer({ port, dbPath });
+startServer({ port, dbPath, verbose });
