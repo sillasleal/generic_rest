@@ -21,17 +21,17 @@ Generic REST API provides an instant, file-based backend that adapts to your dat
 
 ### As a global CLI tool
 ```bash
-npm install -g generic-rest-api
+npm install -g generic-rest-api-dev
 ```
 
 ### As a project dependency
 ```bash
-npm install generic-rest-api
+npm install generic-rest-api-dev
 ```
 
 ### Using npx (no installation required)
 ```bash
-npx generic-rest-api
+npx generic-rest-api-dev
 ```
 
 ## 🚀 Usage
@@ -42,14 +42,14 @@ Start the server with default settings (port 3000, ./db folder):
 ```bash
 generic-rest
 # or
-npx generic-rest-api
+npx generic-rest-api-dev
 ```
 
 Start with custom port and database path:
 ```bash
 generic-rest --port 8080 --db-path ./my-data
 # or
-npx generic-rest-api -p 8080 --db ./my-data
+npx generic-rest-api-dev -p 8080 --db ./my-data
 ```
 
 ### In Package.json Scripts
@@ -75,7 +75,7 @@ npm run dev-api
 ### Programmatic Usage
 
 ```javascript
-const { GenericRestServer } = require('generic-rest-api');
+const { GenericRestServer } = require('generic-rest-api-dev');
 
 // Create and start server
 const server = new GenericRestServer({
@@ -96,7 +96,7 @@ server.stop().then(() => {
 ### Advanced Programmatic Usage
 
 ```javascript
-const { GenericRestServer } = require('generic-rest-api');
+const { GenericRestServer } = require('generic-rest-api-dev');
 
 const server = new GenericRestServer({
   port: process.env.PORT || 4000,
