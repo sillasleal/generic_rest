@@ -1,676 +1,403 @@
 const request = require('supertest');
 const fs = require('fs').promises;
 const path = require('path');
+const { GenericRestServer } = require('../src/index');
 
-const express = require('express');
-const { v4: uuidv4 } = require('uuid');
-
-const app = express();
-const DB_PATH = path.join(__dirname, '..', 'test-db');
-
-app.use(express.json());
-
-async function ensureDirectoryExists(dirPath) {
-  try {
-    await fs.access(dirPath);
-  } catch (error) {
-    await fs.mkdir(dirPath, { recursive: true });
-  }
-}
-
-function getDbPath(requestPath) {
-  const cleanPath = requestPath.startsWith('/') ? requestPath.slice(1) : requestPath;
-  return path.join(DB_PATH, cleanPath);
-}
-
-app.get('*', async (req, res) => {
-  try {
-    const requestPath = req.path;
-    const pathParts = requestPath.split('/').filter(part => part !== '');
-    
-    if (pathParts.length > 0) {
-      const lastPart = pathParts[pathParts.length - 1];
-      
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      
-      if (uuidRegex.test(lastPart)) {
-        const id = pathParts.pop();
-        const dirPath = getDbPath(pathParts.join('/'));
-        const filePath = path.join(dirPath, `${id}.json`);
-        
-        try {
-          await fs.access(filePath);
-          const content = await fs.readFile(filePath, 'utf8');
-          const data = JSON.parse(content);
-          return res.json(data);
-        } catch (error) {
-          if (error.code === 'ENOENT') {
-            return res.status(404).json({ error: 'Item não encontrado' });
-          } else {
-            throw error;
-          }
-        }
-      }
-    }
-    
-    const fullPath = getDbPath(requestPath);
-    
-    try {
-      const stats = await fs.stat(fullPath);
-      
-      if (stats.isDirectory()) {
-        const files = await fs.readdir(fullPath);
-        const jsonFiles = files.filter(file => file.endsWith('.json'));
-        
-        let items = [];
-        for (const file of jsonFiles) {
-          const filePath = path.join(fullPath, file);
-          const content = await fs.readFile(filePath, 'utf8');
-          const data = JSON.parse(content);
-          items.push({ id: path.parse(file).name, ...data });
-        }
-        
-        const queryParams = req.query;
-        if (Object.keys(queryParams).length > 0) {
-          items = items.filter(item => {
-            return Object.entries(queryParams).every(([key, value]) => {
-              if (key === '_limit' || key === '_offset' || key === '_sort' || key === '_order') {
-                return true;
-              }
-              
-              if (!(key in item)) {
-                return false;
-              }
-              
-              const itemValue = item[key];
-              
-              const itemValueStr = String(itemValue).toLowerCase();
-              const filterValueStr = String(value).toLowerCase();
-              
-              if (filterValueStr.startsWith('>=')) {
-                const numValue = parseFloat(filterValueStr.slice(2));
-                return !isNaN(numValue) && parseFloat(itemValue) >= numValue;
-              }
-              if (filterValueStr.startsWith('<=')) {
-                const numValue = parseFloat(filterValueStr.slice(2));
-                return !isNaN(numValue) && parseFloat(itemValue) <= numValue;
-              }
-              if (filterValueStr.startsWith('>')) {
-                const numValue = parseFloat(filterValueStr.slice(1));
-                return !isNaN(numValue) && parseFloat(itemValue) > numValue;
-              }
-              if (filterValueStr.startsWith('<')) {
-                const numValue = parseFloat(filterValueStr.slice(1));
-                return !isNaN(numValue) && parseFloat(itemValue) < numValue;
-              }
-              if (filterValueStr.startsWith('!=')) {
-                return itemValueStr !== filterValueStr.slice(2);
-              }
-              if (filterValueStr.includes('*')) {
-                const regex = new RegExp(filterValueStr.replace(/\*/g, '.*'), 'i');
-                return regex.test(itemValueStr);
-              }
-              
-              return itemValueStr === filterValueStr;
-            });
-          });
-        }
-        
-        if (queryParams._sort) {
-          const sortField = queryParams._sort;
-          const sortOrder = queryParams._order === 'desc' ? -1 : 1;
-          
-          items.sort((a, b) => {
-            const aValue = a[sortField];
-            const bValue = b[sortField];
-            
-            if (aValue === undefined) return 1;
-            if (bValue === undefined) return -1;
-            
-            if (typeof aValue === 'string' && typeof bValue === 'string') {
-              return aValue.localeCompare(bValue) * sortOrder;
-            }
-            
-            if (aValue < bValue) return -1 * sortOrder;
-            if (aValue > bValue) return 1 * sortOrder;
-            return 0;
-          });
-        }
-        
-        if (queryParams._offset || queryParams._limit) {
-          const offset = parseInt(queryParams._offset) || 0;
-          const limit = parseInt(queryParams._limit);
-          
-          if (limit) {
-            items = items.slice(offset, offset + limit);
-          } else if (offset) {
-            items = items.slice(offset);
-          }
-        }
-        
-        res.json(items);
-      } else if (stats.isFile() && fullPath.endsWith('.json')) {
-        const content = await fs.readFile(fullPath, 'utf8');
-        const data = JSON.parse(content);
-        res.json(data);
-      } else {
-        res.status(404).json({ error: 'Arquivo não encontrado' });
-      }
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        res.json([]);
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    console.error('Erro no GET:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-app.post('*', async (req, res) => {
-  try {
-    const requestPath = req.path;
-    const fullPath = getDbPath(requestPath);
-    
-    await ensureDirectoryExists(fullPath);
-    
-    const id = uuidv4();
-    const fileName = `${id}.json`;
-    const filePath = path.join(fullPath, fileName);
-    
-    const data = { id, ...req.body, createdAt: new Date().toISOString() };
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-    
-    res.status(201).json(data);
-  } catch (error) {
-    console.error('Erro no POST:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-app.put('*', async (req, res) => {
-  try {
-    const requestPath = req.path;
-    const pathParts = requestPath.split('/').filter(part => part !== '');
-    
-    if (pathParts.length === 0) {
-      return res.status(400).json({ error: 'ID é obrigatório para atualização' });
-    }
-    
-    const id = pathParts.pop();
-    const dirPath = getDbPath(pathParts.join('/'));
-    const filePath = path.join(dirPath, `${id}.json`);
-    
-    try {
-      await fs.access(filePath);
-      
-      const currentContent = await fs.readFile(filePath, 'utf8');
-      const currentData = JSON.parse(currentContent);
-      
-      const updatedData = { 
-        ...currentData, 
-        ...req.body, 
-        id: id,
-        updatedAt: new Date().toISOString() 
-      };
-      
-      await fs.writeFile(filePath, JSON.stringify(updatedData, null, 2));
-      
-      res.json(updatedData);
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        res.status(404).json({ error: 'Item não encontrado' });
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    console.error('Erro no PUT:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-app.patch('*', async (req, res) => {
-  try {
-    const requestPath = req.path;
-    const pathParts = requestPath.split('/').filter(part => part !== '');
-    
-    if (pathParts.length === 0) {
-      return res.status(400).json({ error: 'ID é obrigatório para atualização' });
-    }
-    
-    const id = pathParts.pop();
-    const dirPath = getDbPath(pathParts.join('/'));
-    const filePath = path.join(dirPath, `${id}.json`);
-    
-    try {
-      await fs.access(filePath);
-      
-      const currentContent = await fs.readFile(filePath, 'utf8');
-      const currentData = JSON.parse(currentContent);
-      
-      const updatedData = { 
-        ...currentData, 
-        ...req.body, 
-        id: id,
-        updatedAt: new Date().toISOString() 
-      };
-      
-      await fs.writeFile(filePath, JSON.stringify(updatedData, null, 2));
-      
-      res.json(updatedData);
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        res.status(404).json({ error: 'Item não encontrado' });
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    console.error('Erro no PATCH:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-app.delete('*', async (req, res) => {
-  try {
-    const requestPath = req.path;
-    const pathParts = requestPath.split('/').filter(part => part !== '');
-    
-    if (pathParts.length === 0) {
-      return res.status(400).json({ error: 'ID é obrigatório para exclusão' });
-    }
-    
-    const id = pathParts.pop();
-    const dirPath = getDbPath(pathParts.join('/'));
-    const filePath = path.join(dirPath, `${id}.json`);
-    
-    try {
-      await fs.access(filePath);
-      
-      await fs.unlink(filePath);
-      
-      res.json({ message: 'Item removido com sucesso', id });
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        res.status(404).json({ error: 'Item não encontrado' });
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    console.error('Erro no DELETE:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-app.use((req, res) => {
-  res.status(404).json({ error: 'Rota não encontrada' });
-});
-
-async function cleanupTestData() {
-  try {
-    await fs.rm(DB_PATH, { recursive: true, force: true });
-  } catch (error) {
-  }
-}
+const TEST_DB_PATH = path.join(__dirname, 'test-db');
 
 describe('Generic REST API', () => {
+  let server;
+  let app;
+
+  beforeAll(async () => {
+    // Create a server instance for testing
+    server = new GenericRestServer({
+      port: 0, // Use any available port
+      dbPath: TEST_DB_PATH
+    });
+    
+    app = server.getApp();
+  });
+
   beforeEach(async () => {
-    await cleanupTestData();
+    // Clean test database before each test
+    try {
+      await fs.rm(TEST_DB_PATH, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore if directory doesn't exist
+    }
   });
 
   afterAll(async () => {
-    await cleanupTestData();
+    // Clean up test database after all tests
+    try {
+      await fs.rm(TEST_DB_PATH, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore if directory doesn't exist
+    }
   });
 
-  describe('POST /', () => {
-    test('should create a new item', async () => {
-      const newItem = {
-        nome: 'Casa de Teste',
-        preco: 500000,
-        quartos: 3
+  describe('POST requests', () => {
+    it('should create a new item and return it with UUID and createdAt', async () => {
+      const userData = {
+        name: 'John Doe',
+        email: 'john@example.com'
       };
 
       const response = await request(app)
-        .post('/casas')
-        .send(newItem)
+        .post('/users')
+        .send(userData)
         .expect(201);
 
-      expect(response.body).toMatchObject({
-        id: expect.any(String),
-        nome: 'Casa de Teste',
-        preco: 500000,
-        quartos: 3,
-        createdAt: expect.any(String)
-      });
-
-      const filePath = path.join(DB_PATH, 'casas', `${response.body.id}.json`);
-      const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
-      expect(fileExists).toBe(true);
+      expect(response.body).toHaveProperty('id');
+      expect(response.body).toHaveProperty('createdAt');
+      expect(response.body.name).toBe(userData.name);
+      expect(response.body.email).toBe(userData.email);
+      
+      // Verify UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      expect(response.body.id).toMatch(uuidRegex);
     });
 
-    test('should create item in nested path', async () => {
-      const newItem = { nome: 'Usuário Teste' };
+    it('should create nested directory structure', async () => {
+      const productData = {
+        name: 'Laptop',
+        price: 999.99
+      };
 
       const response = await request(app)
-        .post('/usuarios/admin')
-        .send(newItem)
+        .post('/products/electronics')
+        .send(productData)
         .expect(201);
 
-      expect(response.body).toMatchObject({
-        id: expect.any(String),
-        nome: 'Usuário Teste',
-        createdAt: expect.any(String)
-      });
+      expect(response.body.name).toBe(productData.name);
+      expect(response.body.price).toBe(productData.price);
+
+      // Check if file was created in correct directory
+      const dirPath = path.join(TEST_DB_PATH, 'products', 'electronics');
+      const files = await fs.readdir(dirPath);
+      expect(files).toHaveLength(1);
+      expect(files[0]).toMatch(/^[0-9a-f-]+\.json$/);
     });
   });
 
-  describe('GET /', () => {
-    let createdItemId;
-
-    beforeEach(async () => {
+  describe('GET requests', () => {
+    it('should return empty array for non-existent collection', async () => {
       const response = await request(app)
-        .post('/casas')
-        .send({
-          nome: 'Casa Teste',
-          preco: 400000,
-          quartos: 2,
-          cidade: 'São Paulo'
-        });
-      createdItemId = response.body.id;
-    });
-
-    test('should list all items in a collection', async () => {
-      const response = await request(app)
-        .get('/casas')
+        .get('/users')
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0]).toMatchObject({
-        id: createdItemId,
-        nome: 'Casa Teste',
-        preco: 400000,
-        quartos: 2,
-        cidade: 'São Paulo'
-      });
+      expect(response.body).toEqual([]);
     });
 
-    test('should return empty array for non-existent collection', async () => {
-      const response = await request(app)
-        .get('/produtos')
+    it('should return list of items after creation', async () => {
+      // Create a user first
+      const userData = { name: 'John Doe', email: 'john@example.com' };
+      const createResponse = await request(app)
+        .post('/users')
+        .send(userData)
+        .expect(201);
+
+      // Get the list
+      const listResponse = await request(app)
+        .get('/users')
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body).toHaveLength(0);
+      expect(listResponse.body).toHaveLength(1);
+      expect(listResponse.body[0]).toEqual(createResponse.body);
     });
 
-    test('should get specific item by ID', async () => {
-      const response = await request(app)
-        .get(`/casas/${createdItemId}`)
+    it('should return specific item by UUID', async () => {
+      // Create a user first
+      const userData = { name: 'John Doe', email: 'john@example.com' };
+      const createResponse = await request(app)
+        .post('/users')
+        .send(userData)
+        .expect(201);
+
+      const userId = createResponse.body.id;
+
+      // Get specific user
+      const getResponse = await request(app)
+        .get(`/users/${userId}`)
         .expect(200);
 
-      expect(response.body).toMatchObject({
-        id: createdItemId,
-        nome: 'Casa Teste',
-        preco: 400000,
-        quartos: 2,
-        cidade: 'São Paulo'
-      });
+      expect(getResponse.body).toEqual(createResponse.body);
     });
 
-    test('should return 404 for non-existent item', async () => {
-      const fakeId = '550e8400-e29b-41d4-a716-446655440000';
+    it('should return 404 for non-existent item', async () => {
+      const nonExistentId = '550e8400-e29b-41d4-a716-446655440000';
+      
       const response = await request(app)
-        .get(`/casas/${fakeId}`)
+        .get(`/users/${nonExistentId}`)
         .expect(404);
 
-      expect(response.body).toEqual({ error: 'Item não encontrado' });
+      expect(response.body).toHaveProperty('error');
     });
   });
 
-  describe('GET / with filters', () => {
+  describe('Filtering', () => {
     beforeEach(async () => {
-      await request(app).post('/casas').send({
-        nome: 'Casa Pequena',
-        preco: 300000,
-        quartos: 2,
-        cidade: 'São Paulo'
-      });
+      // Create test data
+      const users = [
+        { name: 'John Doe', age: 30, status: 'active' },
+        { name: 'Jane Smith', age: 25, status: 'inactive' },
+        { name: 'Bob Johnson', age: 35, status: 'active' }
+      ];
 
-      await request(app).post('/casas').send({
-        nome: 'Casa Grande',
-        preco: 800000,
-        quartos: 4,
-        cidade: 'Rio de Janeiro'
-      });
-
-      await request(app).post('/casas').send({
-        nome: 'Casa Média',
-        preco: 500000,
-        quartos: 3,
-        cidade: 'São Paulo'
-      });
+      for (const user of users) {
+        await request(app).post('/users').send(user);
+      }
     });
 
-    test('should filter by exact value', async () => {
+    it('should filter by exact match', async () => {
       const response = await request(app)
-        .get('/casas?cidade=São Paulo')
+        .get('/users?status=active')
         .expect(200);
 
       expect(response.body).toHaveLength(2);
-      expect(response.body.every(item => item.cidade === 'São Paulo')).toBe(true);
+      response.body.forEach(user => {
+        expect(user.status).toBe('active');
+      });
     });
 
-    test('should filter by wildcard', async () => {
+    it('should filter by wildcard', async () => {
       const response = await request(app)
-        .get('/casas?nome=Casa*')
+        .get('/users?name=Jane*')
         .expect(200);
 
-      expect(response.body).toHaveLength(3);
+      // Jane* should match only "Jane Smith"
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].name).toBe('Jane Smith');
     });
 
-    test('should filter by numeric comparison (greater than)', async () => {
+    it('should filter by numeric comparison (>=)', async () => {
       const response = await request(app)
-        .get('/casas?preco=>400000')
-        .expect(200);
-
-      expect(response.body).toHaveLength(2);
-      expect(response.body.every(item => item.preco > 400000)).toBe(true);
-    });
-
-    test('should filter by numeric comparison (less than or equal)', async () => {
-      const response = await request(app)
-        .get('/casas?preco=<=500000')
+        .get('/users?age=%3E%3D30') // URL encoded >=30
         .expect(200);
 
       expect(response.body).toHaveLength(2);
-      expect(response.body.every(item => item.preco <= 500000)).toBe(true);
+      response.body.forEach(user => {
+        expect(user.age).toBeGreaterThanOrEqual(30);
+      });
     });
 
-    test('should combine multiple filters', async () => {
+    it('should filter by numeric comparison (<)', async () => {
       const response = await request(app)
-        .get('/casas?cidade=São Paulo&quartos=>2')
+        .get('/users?age=%3C30') // URL encoded <30
         .expect(200);
 
       expect(response.body).toHaveLength(1);
-      expect(response.body[0].nome).toBe('Casa Média');
+      expect(response.body[0].age).toBeLessThan(30);
     });
 
-    test('should sort results', async () => {
+    it('should filter by negation (!=)', async () => {
       const response = await request(app)
-        .get('/casas?_sort=preco&_order=desc')
+        .get('/users?status=%21%3Dactive') // URL encoded !=active
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].status).toBe('inactive');
+    });
+  });
+
+  describe('Sorting', () => {
+    beforeEach(async () => {
+      const users = [
+        { name: 'Charlie', age: 30 },
+        { name: 'Alice', age: 25 },
+        { name: 'Bob', age: 35 }
+      ];
+
+      for (const user of users) {
+        await request(app).post('/users').send(user);
+      }
+    });
+
+    it('should sort by field ascending', async () => {
+      const response = await request(app)
+        .get('/users?_sort=name&_order=asc')
         .expect(200);
 
       expect(response.body).toHaveLength(3);
-      expect(response.body[0].preco).toBe(800000);
-      expect(response.body[1].preco).toBe(500000);
-      expect(response.body[2].preco).toBe(300000);
+      expect(response.body[0].name).toBe('Alice');
+      expect(response.body[1].name).toBe('Bob');
+      expect(response.body[2].name).toBe('Charlie');
     });
 
-    test('should paginate results', async () => {
+    it('should sort by field descending', async () => {
       const response = await request(app)
-        .get('/casas?_limit=2&_offset=1')
+        .get('/users?_sort=age&_order=desc')
+        .expect(200);
+
+      expect(response.body).toHaveLength(3);
+      expect(response.body[0].age).toBe(35);
+      expect(response.body[1].age).toBe(30);
+      expect(response.body[2].age).toBe(25);
+    });
+  });
+
+  describe('Pagination', () => {
+    beforeEach(async () => {
+      // Create 5 users
+      for (let i = 1; i <= 5; i++) {
+        await request(app)
+          .post('/users')
+          .send({ name: `User ${i}`, index: i });
+      }
+    });
+
+    it('should limit results', async () => {
+      const response = await request(app)
+        .get('/users?_limit=3')
+        .expect(200);
+
+      expect(response.body).toHaveLength(3);
+    });
+
+    it('should offset results', async () => {
+      const response = await request(app)
+        .get('/users?_offset=2&_limit=2')
         .expect(200);
 
       expect(response.body).toHaveLength(2);
     });
   });
 
-  describe('PUT /', () => {
-    let createdItemId;
+  describe('PUT requests', () => {
+    it('should update existing item completely', async () => {
+      // Create a user first
+      const userData = { name: 'John Doe', email: 'john@example.com' };
+      const createResponse = await request(app)
+        .post('/users')
+        .send(userData)
+        .expect(201);
 
-    beforeEach(async () => {
-      const response = await request(app)
-        .post('/casas')
-        .send({
-          nome: 'Casa Original',
-          preco: 400000,
-          quartos: 2
-        });
-      createdItemId = response.body.id;
-    });
+      const userId = createResponse.body.id;
 
-    test('should update existing item', async () => {
-      const updatedData = {
-        nome: 'Casa Atualizada',
-        preco: 450000,
-        quartos: 3
-      };
-
-      const response = await request(app)
-        .put(`/casas/${createdItemId}`)
+      // Update the user
+      const updatedData = { name: 'John Smith', email: 'john.smith@example.com', age: 30 };
+      const updateResponse = await request(app)
+        .put(`/users/${userId}`)
         .send(updatedData)
         .expect(200);
 
-      expect(response.body).toMatchObject({
-        id: createdItemId,
-        nome: 'Casa Atualizada',
-        preco: 450000,
-        quartos: 3,
-        updatedAt: expect.any(String)
-      });
+      expect(updateResponse.body.id).toBe(userId);
+      expect(updateResponse.body.name).toBe(updatedData.name);
+      expect(updateResponse.body.email).toBe(updatedData.email);
+      expect(updateResponse.body.age).toBe(updatedData.age);
+      expect(updateResponse.body).toHaveProperty('updatedAt');
+      expect(updateResponse.body).toHaveProperty('createdAt');
     });
 
-    test('should return 404 for non-existent item', async () => {
-      const fakeId = '550e8400-e29b-41d4-a716-446655440000';
+    it('should return 404 for non-existent item', async () => {
+      const nonExistentId = '550e8400-e29b-41d4-a716-446655440000';
+      
       const response = await request(app)
-        .put(`/casas/${fakeId}`)
-        .send({ nome: 'Casa Inexistente' })
+        .put(`/users/${nonExistentId}`)
+        .send({ name: 'Test' })
         .expect(404);
 
-      expect(response.body).toEqual({ error: 'Item não encontrado' });
-    });
-
-    test('should return 404 when no ID provided', async () => {
-      const response = await request(app)
-        .put('/casas')
-        .send({ nome: 'Casa Sem ID' })
-        .expect(404);
-
-      expect(response.body).toEqual({ error: 'Item não encontrado' });
+      expect(response.body).toHaveProperty('error');
     });
   });
 
-  describe('PATCH /', () => {
-    let createdItemId;
+  describe('PATCH requests', () => {
+    it('should update existing item partially', async () => {
+      // Create a user first
+      const userData = { name: 'John Doe', email: 'john@example.com', age: 25 };
+      const createResponse = await request(app)
+        .post('/users')
+        .send(userData)
+        .expect(201);
 
-    beforeEach(async () => {
-      const response = await request(app)
-        .post('/casas')
-        .send({
-          nome: 'Casa Original',
-          preco: 400000,
-          quartos: 2,
-          cidade: 'São Paulo'
-        });
-      createdItemId = response.body.id;
-    });
+      const userId = createResponse.body.id;
 
-    test('should partially update existing item', async () => {
-      const partialUpdate = { preco: 450000 };
-
-      const response = await request(app)
-        .patch(`/casas/${createdItemId}`)
+      // Partially update the user
+      const partialUpdate = { age: 30 };
+      const updateResponse = await request(app)
+        .patch(`/users/${userId}`)
         .send(partialUpdate)
         .expect(200);
 
-      expect(response.body).toMatchObject({
-        id: createdItemId,
-        nome: 'Casa Original',
-        preco: 450000,
-        quartos: 2,
-        cidade: 'São Paulo',
-        updatedAt: expect.any(String)
-      });
-    });
-
-    test('should return 404 for non-existent item', async () => {
-      const fakeId = '550e8400-e29b-41d4-a716-446655440000';
-      const response = await request(app)
-        .patch(`/casas/${fakeId}`)
-        .send({ preco: 500000 })
-        .expect(404);
-
-      expect(response.body).toEqual({ error: 'Item não encontrado' });
+      expect(updateResponse.body.id).toBe(userId);
+      expect(updateResponse.body.name).toBe(userData.name); // Should remain unchanged
+      expect(updateResponse.body.email).toBe(userData.email); // Should remain unchanged
+      expect(updateResponse.body.age).toBe(30); // Should be updated
+      expect(updateResponse.body).toHaveProperty('updatedAt');
     });
   });
 
-  describe('DELETE /', () => {
-    let createdItemId;
+  describe('DELETE requests', () => {
+    it('should delete existing item', async () => {
+      // Create a user first
+      const userData = { name: 'John Doe', email: 'john@example.com' };
+      const createResponse = await request(app)
+        .post('/users')
+        .send(userData)
+        .expect(201);
 
-    beforeEach(async () => {
-      const response = await request(app)
-        .post('/casas')
-        .send({
-          nome: 'Casa Para Deletar',
-          preco: 400000,
-          quartos: 2
-        });
-      createdItemId = response.body.id;
-    });
+      const userId = createResponse.body.id;
 
-    test('should delete existing item', async () => {
-      const response = await request(app)
-        .delete(`/casas/${createdItemId}`)
+      // Delete the user
+      const deleteResponse = await request(app)
+        .delete(`/users/${userId}`)
         .expect(200);
 
-      expect(response.body).toEqual({
-        message: 'Item removido com sucesso',
-        id: createdItemId
-      });
+      expect(deleteResponse.body).toHaveProperty('message');
+      expect(deleteResponse.body.id).toBe(userId);
 
-      const filePath = path.join(DB_PATH, 'casas', `${createdItemId}.json`);
-      const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
-      expect(fileExists).toBe(false);
+      // Verify user is deleted
+      await request(app)
+        .get(`/users/${userId}`)
+        .expect(404);
     });
 
-    test('should return 404 for non-existent item', async () => {
-      const fakeId = '550e8400-e29b-41d4-a716-446655440000';
+    it('should return 404 for non-existent item', async () => {
+      const nonExistentId = '550e8400-e29b-41d4-a716-446655440000';
+      
       const response = await request(app)
-        .delete(`/casas/${fakeId}`)
+        .delete(`/users/${nonExistentId}`)
         .expect(404);
 
-      expect(response.body).toEqual({ error: 'Item não encontrado' });
-    });
-
-    test('should return 404 when no ID provided', async () => {
-      const response = await request(app)
-        .delete('/casas')
-        .expect(404);
-
-      expect(response.body).toEqual({ error: 'Item não encontrado' });
+      expect(response.body).toHaveProperty('error');
     });
   });
 
   describe('Error handling', () => {
-    test('should return 404 for undefined routes', async () => {
+    it('should handle PUT to collection (treating as POST-like behavior)', async () => {
+      // Since PUT without ID goes to the collection route, it gets handled by 404 handler
       const response = await request(app)
-        .get('/rota/inexistente/muito/longa')
-        .expect(200);
+        .put('/users')
+        .send({ name: 'Test' })
+        .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should handle PATCH to collection (treating as not found)', async () => {
+      // Since PATCH without ID goes to the collection route, it gets handled by 404 handler
+      const response = await request(app)
+        .patch('/users')
+        .send({ name: 'Test' })
+        .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should handle DELETE to collection (treating as not found)', async () => {
+      // Since DELETE without ID goes to the collection route, it gets handled by 404 handler
+      const response = await request(app)
+        .delete('/users')
+        .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should return empty array for unknown collections', async () => {
+      const response = await request(app)
+        .get('/unknown-endpoint')
+        .expect(200); // Returns empty array for non-existent collections
 
       expect(response.body).toEqual([]);
     });
