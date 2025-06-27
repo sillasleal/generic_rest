@@ -454,8 +454,8 @@ To publish this package to npm:
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/generic-rest-api.git
-cd generic-rest-api
+git clone https://github.com/your-username/generic-rest-api-dev.git
+cd generic-rest-api-dev
 
 # Install dependencies
 npm install

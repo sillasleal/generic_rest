@@ -2,16 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2025-06-27
+
+### Changed
+- 📦 **Package Name**: Updated package name to `generic-rest-api-dev` throughout documentation
+- 📖 **Documentation**: Updated README.md and USAGE.md to reflect new package name
+- 🔧 **Installation Commands**: Updated all npm install examples to use `generic-rest-api-dev`
+- 💻 **Code Examples**: Updated all require statements to use `generic-rest-api-dev`
+
 ## [1.0.0] - 2025-06-27
 
 ### Added - Library Transformation
 - 🚀 **CLI Command**: Global installable command `generic-rest`
-- 📦 **NPM Package**: Can be installed via `npm install generic-rest-api`
+- 📦 **NPM Package**: Can be installed via `npm install generic-rest-api-dev`
 - 🔧 **Programmatic API**: `GenericRestServer` class for embedding in Node.js apps
 - 📖 **Package.json Scripts**: Easy integration with project scripts
 - 🛠 **Command Line Options**: `--port`, `--db-path`, `--help`
 - 📝 **Usage Documentation**: Comprehensive USAGE.md with examples
-- ⚡ **NPX Support**: Run without installation using `npx generic-rest-api`
+- ⚡ **NPX Support**: Run without installation using `npx generic-rest-api-dev`
 
 ### Changed - Code Structure
 - 🏗 **Refactored Architecture**: Split monolithic file into modular structure
@@ -34,13 +42,13 @@ All notable changes to this project will be documented in this file.
 ### Installation Options
 ```bash
 # Global installation
-npm install -g generic-rest-api
+npm install -g generic-rest-api-dev
 
 # Project dependency
-npm install generic-rest-api
+npm install generic-rest-api-dev
 
 # No installation (npx)
-npx generic-rest-api
+npx generic-rest-api-dev
 ```
 
 ### Usage Examples
@@ -57,7 +65,7 @@ generic-rest --port 8080 --db-path ./data
 }
 
 # Programmatic usage
-const { GenericRestServer } = require('generic-rest-api');
+const { GenericRestServer } = require('generic-rest-api-dev');
 const server = new GenericRestServer({ port: 3000, dbPath: './data' });
 server.start();
 ```

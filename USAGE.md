@@ -4,12 +4,12 @@
 
 ### Install globally
 ```bash
-npm install -g generic-rest-api
+npm install -g generic-rest-api-dev
 ```
 
 ### Install as project dependency
 ```bash
-npm install generic-rest-api
+npm install generic-rest-api-dev
 ```
 
 ## Command Line Usage
@@ -31,8 +31,8 @@ generic-rest -p 8080 --db ./api-data
 
 ### Using npx (no installation needed)
 ```bash
-npx generic-rest-api
-npx generic-rest-api --port 8080 --db-path ./data
+npx generic-rest-api-dev
+npx generic-rest-api-dev --port 8080 --db-path ./data
 ```
 
 ## Package.json Scripts
@@ -61,7 +61,7 @@ npm run backend      # Starts on port 4000 with ./backend-data
 
 ### Basic server setup
 ```javascript
-const { GenericRestServer } = require('generic-rest-api');
+const { GenericRestServer } = require('generic-rest-api-dev');
 
 const server = new GenericRestServer({
   port: 3000,
@@ -75,7 +75,7 @@ server.start().then(() => {
 
 ### With custom middleware
 ```javascript
-const { GenericRestServer } = require('generic-rest-api');
+const { GenericRestServer } = require('generic-rest-api-dev');
 
 const server = new GenericRestServer({
   port: process.env.PORT || 4000,
@@ -111,7 +111,7 @@ server.start().catch(console.error);
 
 ### With graceful shutdown
 ```javascript
-const { GenericRestServer } = require('generic-rest-api');
+const { GenericRestServer } = require('generic-rest-api-dev');
 
 const server = new GenericRestServer({
   port: 3000,
@@ -257,7 +257,7 @@ services:
       - .:/app
     ports:
       - "3000:3000"
-    command: npx generic-rest-api --port 3000 --db-path /app/data
+    command: npx generic-rest-api-dev --port 3000 --db-path /app/data
     
   frontend:
     image: node:16
