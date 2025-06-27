@@ -1,16 +1,50 @@
 {
-  "name": "generic-rest",
+  "name": "generic-rest-api",
   "version": "1.0.0",
+  "description": "A generic REST API library that creates and manages JSON files based on the request path. Perfect for rapid prototyping, testing, and development environments.",
   "main": "src/index.js",
+  "bin": {
+    "generic-rest": "./bin/generic-rest"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "README.md",
+    "TESTS.md"
+  ],
+  "keywords": [
+    "rest",
+    "api",
+    "json",
+    "mock",
+    "server",
+    "prototype",
+    "testing",
+    "development",
+    "file-based",
+    "express"
+  ],
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "prepublishOnly": "npm test",
+    "postinstall": "echo '\n🚀 Generic REST API installed successfully!\n\nUsage:\n  npx generic-rest\n  npx generic-rest --port 8080\n  npx generic-rest --db-path ./data\n\nIn package.json scripts:\n  \"api\": \"generic-rest --port 3001\"\n  \"mock-server\": \"generic-rest --db ./mock-data\"\n\nThen run: npm run api\n'"
   },
-  "author": "",
-  "license": "ISC",
-  "description": "API REST genérica que cria arquivos JSON baseados no path da requisição",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/generic-rest-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/generic-rest-api/issues"
+  },
+  "homepage": "https://github.com/your-username/generic-rest-api#readme",
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "uuid": "^9.0.0"

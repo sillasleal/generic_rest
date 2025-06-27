@@ -1,8 +1,8 @@
 # Generic REST API
 
-A generic REST API that creates and manages JSON files based on the request path.
+A generic REST API library that creates and manages JSON files based on the request path. Perfect for rapid prototyping, testing, and development environments.
 
-## � Motivation
+## 🎯 Motivation
 
 This project was created to address the need for **quick API creation for testing projects at various levels**. Whether you're:
 
@@ -14,7 +14,119 @@ This project was created to address the need for **quick API creation for testin
 
 Generic REST API provides an instant, file-based backend that adapts to your data structure automatically. No database setup, no complex configuration - just start sending requests and your API endpoints are ready to use.
 
-## �🚀 Features
+## 📦 Installation
+
+### As a global CLI tool
+```bash
+npm install -g generic-rest-api
+```
+
+### As a project dependency
+```bash
+npm install generic-rest-api
+```
+
+### Using npx (no installation required)
+```bash
+npx generic-rest-api
+```
+
+## 🚀 Usage
+
+### Command Line Interface
+
+Start the server with default settings (port 3000, ./db folder):
+```bash
+generic-rest
+# or
+npx generic-rest-api
+```
+
+Start with custom port and database path:
+```bash
+generic-rest --port 8080 --db-path ./my-data
+# or
+npx generic-rest-api -p 8080 --db ./my-data
+```
+
+### In Package.json Scripts
+
+Add to your `package.json`:
+```json
+{
+  "scripts": {
+    "api": "generic-rest --port 3001",
+    "mock-server": "generic-rest --db-path ./mock-data",
+    "dev-api": "generic-rest -p 8080 --db ./dev-data"
+  }
+}
+```
+
+Then run:
+```bash
+npm run api
+npm run mock-server
+npm run dev-api
+```
+
+### Programmatic Usage
+
+```javascript
+const { GenericRestServer } = require('generic-rest-api');
+
+// Create and start server
+const server = new GenericRestServer({
+  port: 3000,
+  dbPath: './data'
+});
+
+server.start().then(() => {
+  console.log('Server started!');
+});
+
+// Stop server
+server.stop().then(() => {
+  console.log('Server stopped!');
+});
+```
+
+### Advanced Programmatic Usage
+
+```javascript
+const { GenericRestServer } = require('generic-rest-api');
+
+const server = new GenericRestServer({
+  port: process.env.PORT || 4000,
+  dbPath: process.env.DB_PATH || './api-data'
+});
+
+// Get Express app for custom middleware
+const app = server.getApp();
+
+// Add custom middleware before starting
+app.use('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Start server
+server.start().catch(console.error);
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await server.stop();
+  process.exit(0);
+});
+```
+
+## 🔧 CLI Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--port` | `-p` | Port to run the server | `3000` |
+| `--db-path` | `--db` | Database directory path | `./db` |
+| `--help` | `-h` | Show help message | - |
+
+## 🚀 Features
 
 - **GET** - List items from a directory or get a specific item (with advanced filters)
 - **POST** - Create a new item with unique UUID
@@ -25,22 +137,8 @@ Generic REST API provides an instant, file-based backend that adapts to your dat
 ## 📁 Data Structure
 
 - Each item is saved as a JSON file with UUID name (e.g., `550e8400-e29b-41d4-a716-446655440000.json`)
-- The request path corresponds to the path in the `db/` folder
+- The request path corresponds to the path in the database folder
 - Directories are created automatically as needed
-
-## 🐳 Using Dev Container
-
-### Prerequisites
-- VS Code installed
-- "Dev Containers" extension installed
-- Docker installed and running
-
-### How to use
-1. Open the project in VS Code
-2. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
-3. Type "Dev Containers: Reopen in Container"
-4. Wait for the container to be built and configured
-5. The server will start automatically on port 3000
 
 ## 📝 Usage Examples
 
@@ -311,7 +409,75 @@ PATCH /users/123
 # Note that "email" and "age" were preserved
 ```
 
-## 📄 License
+## � Publishing & Contributing
+
+### Publishing to NPM
+
+To publish this package to npm:
+
+1. **Update version** in `package.json`
+2. **Run tests** to ensure everything works:
+   ```bash
+   npm test
+   ```
+3. **Login to npm**:
+   ```bash
+   npm login
+   ```
+4. **Publish**:
+   ```bash
+   npm publish
+   ```
+
+### Before Publishing Checklist
+- [ ] All tests pass (`npm test`)
+- [ ] README.md is updated
+- [ ] CHANGELOG.md is updated
+- [ ] Version is bumped in package.json
+- [ ] Repository URL is correct in package.json
+
+### Contributing
+
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+3. **Make** your changes
+4. **Add tests** for new functionality
+5. **Run tests**: `npm test`
+6. **Commit** changes: `git commit -m 'Add amazing feature'`
+7. **Push** to branch: `git push origin feature/amazing-feature`
+8. **Create** a Pull Request
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/your-username/generic-rest-api.git
+cd generic-rest-api
+
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Run development server
+npm run dev
+
+# Test CLI command
+node bin/generic-rest --help
+```
+
+### Running Examples
+
+```bash
+# Test the programmatic API
+node examples.js
+
+# Test CLI manually
+node bin/generic-rest --port 3333 --db-path ./test-data
+```
+
+## �📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
