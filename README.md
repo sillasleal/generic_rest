@@ -1,5 +1,8 @@
 # Generic REST API
 
+[![Node.js Package](https://github.com/sillasleal/generic_rest/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/sillasleal/generic_rest/actions/workflows/npm-publish.yml)
+[![Node.js Tests](https://github.com/sillasleal/generic_rest/actions/workflows/node.js.yml/badge.svg)](https://github.com/sillasleal/generic_rest/actions/workflows/node.js.yml)
+
 A generic REST API library that creates and manages JSON files based on the request path. Perfect for rapid prototyping, testing, and development environments.
 
 ## 🎯 Motivation
