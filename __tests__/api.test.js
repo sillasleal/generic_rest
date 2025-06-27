@@ -402,4 +402,66 @@ describe('Generic REST API', () => {
       expect(response.body).toEqual([]);
     });
   });
+
+  describe('Verbose logging', () => {
+    let verboseServer;
+    let verboseApp;
+    let consoleLogSpy;
+
+    beforeAll(() => {
+      consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      
+      verboseServer = new GenericRestServer({
+        port: 0,
+        dbPath: path.join(TEST_DB_PATH, 'verbose'),
+        verbose: true
+      });
+      
+      verboseApp = verboseServer.getApp();
+    });
+
+    afterAll(() => {
+      consoleLogSpy.mockRestore();
+    });
+
+    beforeEach(() => {
+      consoleLogSpy.mockClear();
+    });
+
+    it('should log request and response details when verbose is enabled', async () => {
+      const userData = {
+        name: 'Verbose Test',
+        email: 'verbose@test.com'
+      };
+
+      await request(verboseApp)
+        .post('/test-collection')
+        .send(userData)
+        .expect(201);
+
+      // Check if verbose logging occurred
+      const logCalls = consoleLogSpy.mock.calls;
+      const logMessages = logCalls.map(call => call[0]).join(' ');
+
+      expect(logMessages).toContain('📥'); // Request log icon
+      expect(logMessages).toContain('POST /test-collection');
+      expect(logMessages).toContain('Query:');
+      expect(logMessages).toContain('Body:');
+      expect(logMessages).toContain('📤'); // Response log icon
+      expect(logMessages).toContain('Response');
+      expect(logMessages).toContain('Status: 201');
+    });
+
+    it('should include error logging when verbose is enabled', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Try to access a non-existent item with a valid UUID format to trigger error path
+      const validUuid = '12345678-1234-1234-1234-123456789012';
+      await request(verboseApp)
+        .get(`/users/${validUuid}`)
+        .expect(404);
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
 });

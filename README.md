@@ -52,6 +52,13 @@ generic-rest --port 8080 --db-path ./my-data
 npx generic-rest-api-dev -p 8080 --db ./my-data
 ```
 
+Enable verbose logging to see detailed request/response information:
+```bash
+generic-rest --verbose
+# or
+generic-rest -v --port 8080 --db-path ./data
+```
+
 ### In Package.json Scripts
 
 Add to your `package.json`:
@@ -60,7 +67,8 @@ Add to your `package.json`:
   "scripts": {
     "api": "generic-rest --port 3001",
     "mock-server": "generic-rest --db-path ./mock-data",
-    "dev-api": "generic-rest -p 8080 --db ./dev-data"
+    "dev-api": "generic-rest -p 8080 --db ./dev-data",
+    "api-verbose": "generic-rest --verbose --port 3001"
   }
 }
 ```
@@ -80,7 +88,8 @@ const { GenericRestServer } = require('generic-rest-api-dev');
 // Create and start server
 const server = new GenericRestServer({
   port: 3000,
-  dbPath: './data'
+  dbPath: './data',
+  verbose: true  // Enable verbose logging
 });
 
 server.start().then(() => {
@@ -100,7 +109,8 @@ const { GenericRestServer } = require('generic-rest-api-dev');
 
 const server = new GenericRestServer({
   port: process.env.PORT || 4000,
-  dbPath: process.env.DB_PATH || './api-data'
+  dbPath: process.env.DB_PATH || './api-data',
+  verbose: process.env.VERBOSE === 'true'  // Enable verbose via environment variable
 });
 
 // Get Express app for custom middleware
@@ -334,6 +344,52 @@ npm start -- --db-path ./custom-db
 ```
 
 > **💡 Tip**: The absolute path being used always appears in the server startup log for confirmation.
+
+### Verbose Logging
+Enable detailed request/response logging to monitor API activity in real-time:
+
+#### 1. Command line flag:
+```bash
+generic-rest --verbose
+# or
+generic-rest -v --port 8080
+```
+
+#### 2. Environment variable:
+```bash
+VERBOSE=true npm start
+```
+
+#### 3. Programmatic usage:
+```javascript
+const server = new GenericRestServer({
+  port: 3000,
+  verbose: true
+});
+```
+
+When verbose mode is enabled, you'll see detailed logs including:
+- **📥 Request details**: Method, path, query parameters, request body, and headers
+- **📤 Response details**: Status code, response data, and response time
+- **❌ Error details**: Detailed error information with timestamps
+
+Example verbose output:
+```
+📥 [2025-06-27T10:30:45.123Z] GET /users
+   Query: {"_limit":"10","name":"john*"}
+   Body: {}
+   Headers: {"content-type":"application/json","accept":"application/json"}
+
+📤 [2025-06-27T10:30:45.156Z] Response (33ms):
+   Status: 200
+   Data: [
+     {
+       "id": "123e4567-e89b-12d3-a456-426614174000",
+       "name": "John Doe",
+       "email": "john@example.com"
+     }
+   ]
+```
 
 ## 📋 Endpoints
 
