@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Server",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/index.js",
+            "env": {
+                "NODE_ENV": "development",
+                "PORT": "3000"
+            },
+            "console": "integratedTerminal",
+            "restart": true,
+            "runtimeExecutable": "node",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "name": "Launch with Nodemon",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["nodemon"],
+            "program": "${workspaceFolder}/src/index.js",
+            "env": {
+                "NODE_ENV": "development",
+                "PORT": "3000"
+            },
+            "console": "integratedTerminal",
+            "restart": true,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        }
+    ]
+}

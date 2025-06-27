@@ -1,0 +1,23 @@
+{
+	"name": "generic-rest",
+	"forwardPorts": [
+		9009, 7777, 3000
+	],
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:1-18-bullseye",
+	"customizations": {
+		"vscode": {
+			"settings": {},
+			"extensions": [
+				"streetsidesoftware.code-spell-checker"
+			]
+		}
+	},
+	"portsAttributes": {
+		"3000": {
+			"label": "Hello Remote World",
+			"onAutoForward": "notify"
+		}
+	},
+	"remoteUser": "root",
+	"mounts": []
+}
