@@ -2,18 +2,14 @@ const request = require('supertest');
 const fs = require('fs').promises;
 const path = require('path');
 
-// Importar app sem iniciar o servidor
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 
-// Criar aplicação de teste
 const app = express();
 const DB_PATH = path.join(__dirname, '..', 'test-db');
 
-// Middleware para parsing de JSON
 app.use(express.json());
 
-// Função para garantir que o diretório existe
 async function ensureDirectoryExists(dirPath) {
   try {
     await fs.access(dirPath);
@@ -22,28 +18,22 @@ async function ensureDirectoryExists(dirPath) {
   }
 }
 
-// Função para obter o caminho completo baseado na URL
 function getDbPath(requestPath) {
   const cleanPath = requestPath.startsWith('/') ? requestPath.slice(1) : requestPath;
   return path.join(DB_PATH, cleanPath);
 }
 
-// Configurar rotas (copiado do arquivo principal, mas usando DB_PATH de teste)
-// GET - Listar arquivos ou obter arquivo específico por ID
 app.get('*', async (req, res) => {
   try {
     const requestPath = req.path;
     const pathParts = requestPath.split('/').filter(part => part !== '');
     
-    // Se há partes no caminho, verificar se a última é um UUID (busca por ID)
     if (pathParts.length > 0) {
       const lastPart = pathParts[pathParts.length - 1];
       
-      // Verificar se o último segmento parece um UUID (formato básico)
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       
       if (uuidRegex.test(lastPart)) {
-        // É uma busca por ID
         const id = pathParts.pop();
         const dirPath = getDbPath(pathParts.join('/'));
         const filePath = path.join(dirPath, `${id}.json`);
@@ -63,14 +53,12 @@ app.get('*', async (req, res) => {
       }
     }
     
-    // Caso contrário, listar diretório
     const fullPath = getDbPath(requestPath);
     
     try {
       const stats = await fs.stat(fullPath);
       
       if (stats.isDirectory()) {
-        // Listar arquivos do diretório
         const files = await fs.readdir(fullPath);
         const jsonFiles = files.filter(file => file.endsWith('.json'));
         
@@ -82,28 +70,23 @@ app.get('*', async (req, res) => {
           items.push({ id: path.parse(file).name, ...data });
         }
         
-        // Aplicar filtros baseados nos query parameters
         const queryParams = req.query;
         if (Object.keys(queryParams).length > 0) {
           items = items.filter(item => {
             return Object.entries(queryParams).every(([key, value]) => {
-              // Ignorar parâmetros especiais
               if (key === '_limit' || key === '_offset' || key === '_sort' || key === '_order') {
                 return true;
               }
               
-              // Verificar se o campo existe no item
               if (!(key in item)) {
                 return false;
               }
               
               const itemValue = item[key];
               
-              // Converter valores para string para comparação
               const itemValueStr = String(itemValue).toLowerCase();
               const filterValueStr = String(value).toLowerCase();
               
-              // Suporte a operadores básicos
               if (filterValueStr.startsWith('>=')) {
                 const numValue = parseFloat(filterValueStr.slice(2));
                 return !isNaN(numValue) && parseFloat(itemValue) >= numValue;
@@ -124,18 +107,15 @@ app.get('*', async (req, res) => {
                 return itemValueStr !== filterValueStr.slice(2);
               }
               if (filterValueStr.includes('*')) {
-                // Suporte a wildcards simples
                 const regex = new RegExp(filterValueStr.replace(/\*/g, '.*'), 'i');
                 return regex.test(itemValueStr);
               }
               
-              // Comparação exata (case-insensitive)
               return itemValueStr === filterValueStr;
             });
           });
         }
         
-        // Aplicar ordenação
         if (queryParams._sort) {
           const sortField = queryParams._sort;
           const sortOrder = queryParams._order === 'desc' ? -1 : 1;
@@ -157,7 +137,6 @@ app.get('*', async (req, res) => {
           });
         }
         
-        // Aplicar paginação
         if (queryParams._offset || queryParams._limit) {
           const offset = parseInt(queryParams._offset) || 0;
           const limit = parseInt(queryParams._limit);
@@ -171,7 +150,6 @@ app.get('*', async (req, res) => {
         
         res.json(items);
       } else if (stats.isFile() && fullPath.endsWith('.json')) {
-        // Retornar arquivo específico
         const content = await fs.readFile(fullPath, 'utf8');
         const data = JSON.parse(content);
         res.json(data);
@@ -180,7 +158,6 @@ app.get('*', async (req, res) => {
       }
     } catch (error) {
       if (error.code === 'ENOENT') {
-        // Caminho não existe, retorna array vazio para listagem
         res.json([]);
       } else {
         throw error;
@@ -192,21 +169,17 @@ app.get('*', async (req, res) => {
   }
 });
 
-// POST - Criar novo item
 app.post('*', async (req, res) => {
   try {
     const requestPath = req.path;
     const fullPath = getDbPath(requestPath);
     
-    // Garantir que o diretório existe
     await ensureDirectoryExists(fullPath);
     
-    // Gerar UUID para o arquivo
     const id = uuidv4();
     const fileName = `${id}.json`;
     const filePath = path.join(fullPath, fileName);
     
-    // Salvar dados no arquivo
     const data = { id, ...req.body, createdAt: new Date().toISOString() };
     await fs.writeFile(filePath, JSON.stringify(data, null, 2));
     
@@ -217,7 +190,6 @@ app.post('*', async (req, res) => {
   }
 });
 
-// PUT - Atualizar item existente
 app.put('*', async (req, res) => {
   try {
     const requestPath = req.path;
@@ -227,27 +199,23 @@ app.put('*', async (req, res) => {
       return res.status(400).json({ error: 'ID é obrigatório para atualização' });
     }
     
-    const id = pathParts.pop(); // Último elemento é o ID
+    const id = pathParts.pop();
     const dirPath = getDbPath(pathParts.join('/'));
     const filePath = path.join(dirPath, `${id}.json`);
     
     try {
-      // Verificar se o arquivo existe
       await fs.access(filePath);
       
-      // Ler dados atuais
       const currentContent = await fs.readFile(filePath, 'utf8');
       const currentData = JSON.parse(currentContent);
       
-      // Atualizar dados
       const updatedData = { 
         ...currentData, 
         ...req.body, 
-        id: id, // Manter o ID original
+        id: id,
         updatedAt: new Date().toISOString() 
       };
       
-      // Salvar dados atualizados
       await fs.writeFile(filePath, JSON.stringify(updatedData, null, 2));
       
       res.json(updatedData);
@@ -264,7 +232,6 @@ app.put('*', async (req, res) => {
   }
 });
 
-// PATCH - Atualizar item existente (atualização parcial)
 app.patch('*', async (req, res) => {
   try {
     const requestPath = req.path;
@@ -274,27 +241,23 @@ app.patch('*', async (req, res) => {
       return res.status(400).json({ error: 'ID é obrigatório para atualização' });
     }
     
-    const id = pathParts.pop(); // Último elemento é o ID
+    const id = pathParts.pop();
     const dirPath = getDbPath(pathParts.join('/'));
     const filePath = path.join(dirPath, `${id}.json`);
     
     try {
-      // Verificar se o arquivo existe
       await fs.access(filePath);
       
-      // Ler dados atuais
       const currentContent = await fs.readFile(filePath, 'utf8');
       const currentData = JSON.parse(currentContent);
       
-      // Atualizar apenas os campos fornecidos (merge parcial)
       const updatedData = { 
         ...currentData, 
         ...req.body, 
-        id: id, // Manter o ID original
+        id: id,
         updatedAt: new Date().toISOString() 
       };
       
-      // Salvar dados atualizados
       await fs.writeFile(filePath, JSON.stringify(updatedData, null, 2));
       
       res.json(updatedData);
@@ -311,7 +274,6 @@ app.patch('*', async (req, res) => {
   }
 });
 
-// DELETE - Remover item
 app.delete('*', async (req, res) => {
   try {
     const requestPath = req.path;
@@ -321,15 +283,13 @@ app.delete('*', async (req, res) => {
       return res.status(400).json({ error: 'ID é obrigatório para exclusão' });
     }
     
-    const id = pathParts.pop(); // Último elemento é o ID
+    const id = pathParts.pop();
     const dirPath = getDbPath(pathParts.join('/'));
     const filePath = path.join(dirPath, `${id}.json`);
     
     try {
-      // Verificar se o arquivo existe
       await fs.access(filePath);
       
-      // Remover arquivo
       await fs.unlink(filePath);
       
       res.json({ message: 'Item removido com sucesso', id });
@@ -346,21 +306,17 @@ app.delete('*', async (req, res) => {
   }
 });
 
-// Middleware para tratar rotas não encontradas
 app.use((req, res) => {
   res.status(404).json({ error: 'Rota não encontrada' });
 });
 
-// Função para limpar dados de teste
 async function cleanupTestData() {
   try {
     await fs.rm(DB_PATH, { recursive: true, force: true });
   } catch (error) {
-    // Ignore errors if directory doesn't exist
   }
 }
 
-// Testes
 describe('Generic REST API', () => {
   beforeEach(async () => {
     await cleanupTestData();
@@ -391,7 +347,6 @@ describe('Generic REST API', () => {
         createdAt: expect.any(String)
       });
 
-      // Verificar se o arquivo foi criado
       const filePath = path.join(DB_PATH, 'casas', `${response.body.id}.json`);
       const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
       expect(fileExists).toBe(true);
@@ -417,7 +372,6 @@ describe('Generic REST API', () => {
     let createdItemId;
 
     beforeEach(async () => {
-      // Criar um item para os testes
       const response = await request(app)
         .post('/casas')
         .send({
@@ -480,7 +434,6 @@ describe('Generic REST API', () => {
 
   describe('GET / with filters', () => {
     beforeEach(async () => {
-      // Criar múltiplos itens para teste de filtros
       await request(app).post('/casas').send({
         nome: 'Casa Pequena',
         preco: 300000,
@@ -647,10 +600,10 @@ describe('Generic REST API', () => {
 
       expect(response.body).toMatchObject({
         id: createdItemId,
-        nome: 'Casa Original', // Deve manter valor original
-        preco: 450000,        // Deve atualizar
-        quartos: 2,           // Deve manter valor original
-        cidade: 'São Paulo',  // Deve manter valor original
+        nome: 'Casa Original',
+        preco: 450000,
+        quartos: 2,
+        cidade: 'São Paulo',
         updatedAt: expect.any(String)
       });
     });
@@ -690,7 +643,6 @@ describe('Generic REST API', () => {
         id: createdItemId
       });
 
-      // Verificar se o arquivo foi removido
       const filePath = path.join(DB_PATH, 'casas', `${createdItemId}.json`);
       const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
       expect(fileExists).toBe(false);
@@ -718,7 +670,7 @@ describe('Generic REST API', () => {
     test('should return 404 for undefined routes', async () => {
       const response = await request(app)
         .get('/rota/inexistente/muito/longa')
-        .expect(200); // Retorna 200 com array vazio para coleções inexistentes
+        .expect(200);
 
       expect(response.body).toEqual([]);
     });
