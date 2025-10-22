@@ -1,6 +1,6 @@
 {
   "name": "generic-rest-api-dev",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A generic REST API library that creates and manages JSON files based on the request path. Perfect for rapid prototyping, testing, and development environments.",
   "main": "src/index.js",
   "bin": {
