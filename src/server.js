@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -19,6 +20,14 @@ class GenericRestServer {
   }
 
   setupMiddleware() {
+    // CORS middleware - allow requests from any origin
+    this.app.use(cors({
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+      credentials: false
+    }));
+    
     this.app.use(express.json());
     
     // Verbose logging middleware
