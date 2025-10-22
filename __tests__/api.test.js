@@ -464,4 +464,49 @@ describe('Generic REST API', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('CORS support', () => {
+    it('should include CORS headers in all responses', async () => {
+      const response = await request(app)
+        .get('/test-collection')
+        .set('Origin', 'https://example.com')
+        .expect(200);
+
+      expect(response.headers['access-control-allow-origin']).toBe('*');
+    });
+
+    it('should handle preflight OPTIONS requests correctly', async () => {
+      const response = await request(app)
+        .options('/test-collection')
+        .set('Origin', 'https://example.com')
+        .set('Access-Control-Request-Method', 'POST')
+        .set('Access-Control-Request-Headers', 'Content-Type')
+        .expect(204);
+
+      expect(response.headers['access-control-allow-origin']).toBe('*');
+      expect(response.headers['access-control-allow-methods']).toContain('GET');
+      expect(response.headers['access-control-allow-methods']).toContain('POST');
+      expect(response.headers['access-control-allow-methods']).toContain('PUT');
+      expect(response.headers['access-control-allow-methods']).toContain('PATCH');
+      expect(response.headers['access-control-allow-methods']).toContain('DELETE');
+      expect(response.headers['access-control-allow-methods']).toContain('OPTIONS');
+      expect(response.headers['access-control-allow-headers']).toContain('Content-Type');
+      expect(response.headers['access-control-allow-headers']).toContain('Authorization');
+    });
+
+    it('should allow cross-origin POST requests', async () => {
+      const testData = { name: 'CORS Test', value: 42 };
+      
+      const response = await request(app)
+        .post('/test-collection')
+        .set('Origin', 'https://different-domain.com')
+        .send(testData)
+        .expect(201);
+
+      expect(response.headers['access-control-allow-origin']).toBe('*');
+      expect(response.body).toMatchObject(testData);
+      expect(response.body.id).toBeDefined();
+      expect(response.body.createdAt).toBeDefined();
+    });
+  });
 });
